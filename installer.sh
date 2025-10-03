@@ -3,6 +3,8 @@
 # --- НАСТРОЙКИ ---
 REPO_URL="https://github.com/Rewixx-png/telegram-feedback-bot.git"
 PROJECT_FOLDER="telegram-feedback-bot"
+# ИЗМЕНЕНО: Короткое и статичное имя для процесса PM2
+BOT_NAME="feedback-bot"
 
 # --- ЦВЕТА ДЛЯ ВЫВОДА ---
 GREEN='\033[0;32m'
@@ -17,7 +19,7 @@ function error_exit {
 }
 
 clear
-echo -e "${GREEN}--- Универсальный установщик Feedback Bot (без venv) ---${NC}"
+echo -e "${GREEN}--- Универсальный установщик Feedback Bot ---${NC}"
 echo "Этот скрипт автоматически загрузит, настроит и подготовит к запуску вашего бота."
 echo ""
 
@@ -31,16 +33,11 @@ echo -e "${GREEN}Все базовые утилиты на месте.${NC}"
 echo ""
 
 # --- 2. Установка PM2 (если необходимо) ---
+# ИЗМЕНЕНО: Установка PM2 стала автоматической, без вопросов
 if ! command -v pm2 &> /dev/null; then
-    echo -e "${YELLOW}Менеджер процессов PM2 не найден.${NC}"
-    read -p "Хотите установить его глобально через npm? [Y/n]: " confirm_pm2
-    if [[ "$confirm_pm2" =~ ^[yY](es)?$ || -z "$confirm_pm2" ]]; then
-        echo "--> Устанавливаю PM2..."
-        sudo npm install pm2 -g || error_exit "Не удалось установить PM2."
-        echo -e "${GREEN}PM2 успешно установлен.${NC}"
-    else
-        error_exit "Установка прервана. PM2 необходим для работы."
-    fi
+    echo -e "${YELLOW}Менеджер процессов PM2 не найден. Устанавливаю автоматически...${NC}"
+    sudo npm install pm2 -g || error_exit "Не удалось установить PM2."
+    echo -e "${GREEN}PM2 успешно установлен.${NC}"
 else
     echo -e "${GREEN}PM2 уже установлен.${NC}"
 fi
@@ -98,13 +95,17 @@ echo "$BOT_TOKEN" > token.txt
 sed -i "s/OWNER_ID\s*=\s*[0-9]*/OWNER_ID    = $OWNER_ID/" main.py
 sed -i "s/LOG_CHAT_ID\s*=\s*-[0-9]*/LOG_CHAT_ID = $LOG_CHAT_ID/" main.py
 
-echo "--> Устанавливаю зависимости для текущего пользователя (pip3 install --user)..."
+echo "--> Устанавливаю зависимости (без виртуального окружения)..."
 pip3 install --user -r requirements.txt || error_exit "Не удалось установить зависимости."
 
 # --- 7. Настройка PM2 ---
-BOT_NAME="feedback-bot-$(basename $APP_PATH)"
-PYTHON_PATH=$(command -v python3) # Находим системный python3
+PYTHON_PATH=$(command -v python3)
 echo "--> Создаю конфигурационный файл для PM2 (ecosystem.config.js)..."
+
+# ИЗМЕНЕНО: Проверка на существующий процесс
+if pm2 id "$BOT_NAME" &> /dev/null; then
+    echo -e "${YELLOW}Внимание: Процесс с именем '$BOT_NAME' уже существует в PM2. Конфигурация будет обновлена.${NC}"
+fi
 
 cat <<EOF > ecosystem.config.js
 module.exports = {
